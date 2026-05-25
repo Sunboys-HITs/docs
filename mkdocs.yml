@@ -42,3 +42,6 @@ markdown_extensions:
 nav:
   - Home: index.md
   - SRE Architecture: sre-architecture.md
+
+extra_javascript:
+  - https://unpkg.com/mermaid@10.9.1/dist/mermaid.min.js
