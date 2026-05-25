@@ -37,66 +37,89 @@
 ## 2. Архитектурная Диаграмма
 
 ```mermaid
-flowchart TB
-    user[User: student / teacher]
-    ingress[Nginx Ingress]
+flowchart LR
+    user["Student / Teacher"]
 
-    subgraph app[autocheck namespaces]
-        frontend[frontend]
-        auth[auth-service]
-        classrooms[classrooms-service]
-        task[task-service]
-        package[package-service]
-        notification[notification-service]
-        workers[run-worker pool]
+    subgraph edge["Edge"]
+        ingress["Nginx Ingress"]
+        frontend["frontend"]
     end
 
-    subgraph data[Stateful layer]
-        rabbit[(RabbitMQ)]
-        postgres[(PostgreSQL)]
+    subgraph api["API services"]
+        auth["auth-service"]
+        classrooms["classrooms-service"]
+        task["task-service"]
+        package["package-service"]
+        notification["notification-service"]
     end
 
-    subgraph obs[Observability]
-        prometheus[Prometheus]
-        grafana[Grafana]
-        promtail[Promtail]
-        loki[Loki]
+    subgraph async["Async execution"]
+        rabbit[("RabbitMQ")]
+        workers["run-worker pool"]
+        sandbox["Sandbox containers"]
     end
 
-    user --> ingress
+    subgraph storage["Stateful storage"]
+        postgres[("PostgreSQL")]
+    end
+
+    subgraph observe["Observability"]
+        prometheus["Prometheus"]
+        grafana["Grafana"]
+        promtail["Promtail"]
+        loki["Loki"]
+    end
+
+    user -->|"HTTPS"| ingress
     ingress --> frontend
-    ingress --> auth
-    ingress --> classrooms
-    ingress --> task
-    ingress --> package
+    ingress -->|"REST API"| auth
+    ingress -->|"REST API"| classrooms
+    ingress -->|"REST API"| task
+    ingress -->|"REST API"| package
 
-    frontend --> auth
-    frontend --> classrooms
-    frontend --> task
-    frontend --> package
+    frontend -->|"REST API"| auth
+    frontend -->|"REST API"| classrooms
+    frontend -->|"REST API"| task
+    frontend -->|"REST API"| package
 
+    package -->|"publish check request"| rabbit
+    rabbit -->|"consume"| workers
+    workers -->|"execute"| sandbox
+    workers -->|"publish result"| rabbit
+    rabbit -->|"completion event"| notification
+
+    auth --> postgres
     classrooms --> postgres
     task --> postgres
-    auth --> postgres
     package --> postgres
-    package --> rabbit
-    rabbit --> workers
     workers --> postgres
-    workers --> rabbit
-    rabbit --> notification
     notification --> postgres
 
-    prometheus -. scrapes .-> frontend
-    prometheus -. scrapes .-> auth
-    prometheus -. scrapes .-> classrooms
-    prometheus -. scrapes .-> task
-    prometheus -. scrapes .-> package
-    prometheus -. scrapes .-> workers
-    prometheus -. scrapes .-> rabbit
-    prometheus -. scrapes .-> postgres
+    prometheus -. "scrape /metrics" .-> auth
+    prometheus -. "scrape /metrics" .-> package
+    prometheus -. "scrape /metrics" .-> workers
+    prometheus -. "exporters" .-> rabbit
+    prometheus -. "exporters" .-> postgres
     grafana --> prometheus
+    promtail -. "collect stdout" .-> auth
+    promtail -. "collect stdout" .-> package
+    promtail -. "collect stdout" .-> workers
     promtail --> loki
     grafana --> loki
+
+    classDef external fill:#f8fafc,stroke:#334155,color:#0f172a
+    classDef edgeClass fill:#dbeafe,stroke:#2563eb,color:#172554
+    classDef service fill:#dcfce7,stroke:#16a34a,color:#052e16
+    classDef asyncClass fill:#fef3c7,stroke:#d97706,color:#451a03
+    classDef data fill:#fee2e2,stroke:#dc2626,color:#450a0a
+    classDef obs fill:#ede9fe,stroke:#7c3aed,color:#2e1065
+
+    class user external
+    class ingress,frontend edgeClass
+    class auth,classrooms,task,package,notification service
+    class rabbit,workers,sandbox asyncClass
+    class postgres data
+    class prometheus,grafana,promtail,loki obs
 ```
 
 ## 3. Поток Проверки Решения
@@ -104,7 +127,7 @@ flowchart TB
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User
+    actor User as Student / Teacher
     participant FE as frontend
     participant ING as Nginx Ingress
     participant AUTH as auth-service
@@ -115,31 +138,43 @@ sequenceDiagram
     participant TASK as task-service
     participant NOTIF as notification-service
 
-    User->>FE: Upload solution
-    FE->>ING: POST /api/submissions
-    ING->>PKG: Forward request
-    PKG->>AUTH: Validate JWT / permissions
-    AUTH-->>PKG: subject, roles, tenant
-    PKG->>DB: Create submission(status=Queued)
-    PKG->>MQ: Publish submission.check.requested
-    PKG-->>FE: 202 Accepted + submissionId
-    MQ-->>WRK: Deliver check request
-    WRK->>TASK: Load task limits and test package metadata
-    WRK->>DB: Mark submission Running
-    WRK->>WRK: Start sandbox, compile, execute tests
-    WRK->>DB: Save result, verdict, metrics, logs reference
-    alt success
-        WRK->>MQ: Publish submission.check.completed
-    else failure
-        WRK->>MQ: Publish submission.check.failed
+    rect rgb(239, 246, 255)
+        User->>FE: Upload solution
+        FE->>ING: POST /api/submissions
+        ING->>PKG: Route request
+        PKG->>AUTH: Validate token and access
+        AUTH-->>PKG: Claims and roles
     end
-    MQ-->>NOTIF: Deliver completion event
-    NOTIF->>DB: Read recipients and preferences
-    NOTIF-->>FE: Notify via websocket / polling-visible status
-    FE->>ING: GET /api/submissions/{id}
-    ING->>PKG: Read result
-    PKG->>DB: Load submission result
-    PKG-->>FE: Verdict and details
+
+    rect rgb(240, 253, 244)
+        PKG->>DB: Create submission: Queued
+        PKG->>MQ: Publish check.requested
+        PKG-->>FE: 202 Accepted, submissionId
+    end
+
+    rect rgb(255, 251, 235)
+        MQ-->>WRK: Deliver check request
+        WRK->>TASK: Load limits and tests
+        WRK->>DB: Mark Running
+        WRK->>WRK: Sandbox compile and test
+        WRK->>DB: Save verdict and metrics
+    end
+
+    alt accepted or checked
+        WRK->>MQ: Publish check.completed
+    else infrastructure or runner failure
+        WRK->>MQ: Publish check.failed
+    end
+
+    rect rgb(245, 243, 255)
+        MQ-->>NOTIF: Deliver result event
+        NOTIF->>DB: Load recipients
+        NOTIF-->>FE: Notify status changed
+        FE->>ING: GET /api/submissions/{id}
+        ING->>PKG: Route read request
+        PKG->>DB: Load result
+        PKG-->>FE: Verdict and details
+    end
 ```
 
 ## 4. Kubernetes
