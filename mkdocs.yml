@@ -1,8 +1,8 @@
 site_name: SUNBOYS Platform Documentation
 site_description: Architecture and SRE documentation for the SUNBOYS autocheck platform
-site_url: https://sunboys.github.io/docs/
-repo_name: sunboys/docs
-repo_url: https://github.com/sunboys/docs
+site_url: https://sunboys-hits.github.io/docs/
+repo_name: Sunboys-HITs/docs
+repo_url: https://github.com/Sunboys-HITs/docs
 
 theme:
   name: material
@@ -42,6 +42,8 @@ markdown_extensions:
 nav:
   - Home: index.md
   - SRE Architecture: sre-architecture.md
+  - Kubernetes:
+      - K3s Bootstrap: kubernetes/k3s-bootstrap.md
 
 extra_javascript:
   - https://unpkg.com/mermaid@10.9.1/dist/mermaid.min.js

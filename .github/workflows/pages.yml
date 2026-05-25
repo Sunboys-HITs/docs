@@ -6,6 +6,9 @@ on:
       - main
       - master
   workflow_dispatch:
+  repository_dispatch:
+    types:
+      - external-docs-updated
 
 permissions:
   contents: read
@@ -20,8 +23,20 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout docs
         uses: actions/checkout@v4
+
+      - name: Checkout Kubernetes docs
+        uses: actions/checkout@v4
+        with:
+          repository: Sunboys-HITs/kubernetes-bootstrap
+          ref: main
+          path: external/kubernetes-bootstrap
+
+      - name: Aggregate external docs
+        run: |
+          mkdir -p docs/kubernetes
+          cp -R external/kubernetes-bootstrap/docs/. docs/kubernetes/
 
       - name: Setup Python
         uses: actions/setup-python@v5
