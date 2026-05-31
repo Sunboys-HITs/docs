@@ -38,29 +38,27 @@
 
 ```mermaid
 flowchart LR
-    user["Student / Teacher"]
+    user["Client / Frontend"]
 
     subgraph edge["Edge"]
-        ingress["Nginx Ingress"]
+        ingress["Nginx Gateway"]
         frontend["frontend"]
     end
 
     subgraph api["API services"]
         auth["auth-service"]
-        classrooms["classrooms-service"]
-        task["task-service"]
-        package["package-service"]
+        main["main-service"]
         notification["notification-service"]
     end
 
     subgraph async["Async execution"]
-        rabbit[("RabbitMQ")]
+        rabbit[["RabbitMQ"]]
         workers["run-worker pool"]
         sandbox["Sandbox containers"]
     end
 
     subgraph storage["Stateful storage"]
-        postgres[("PostgreSQL")]
+        db[("PostgreSQL")]
     end
 
     subgraph observe["Observability"]
@@ -73,53 +71,32 @@ flowchart LR
     user -->|"HTTPS"| ingress
     ingress --> frontend
     ingress -->|"REST API"| auth
-    ingress -->|"REST API"| classrooms
-    ingress -->|"REST API"| task
-    ingress -->|"REST API"| package
+    ingress -->|"REST API"| main
 
     frontend -->|"REST API"| auth
-    frontend -->|"REST API"| classrooms
-    frontend -->|"REST API"| task
-    frontend -->|"REST API"| package
+    frontend -->|"REST API"| main
 
-    package -->|"publish check request"| rabbit
+    main -->|"validate JWT"| auth
+    main -->|"read/write data"| db
+    auth -->|"users and roles"| db
+    main -->|"publish check request"| rabbit
     rabbit -->|"consume"| workers
     workers -->|"execute"| sandbox
     workers -->|"publish result"| rabbit
-    rabbit -->|"completion event"| notification
-
-    auth --> postgres
-    classrooms --> postgres
-    task --> postgres
-    package --> postgres
-    workers --> postgres
-    notification --> postgres
+    rabbit -->|"completion event"| main
+    main -->|"notify status changes"| notification
 
     prometheus -. "scrape /metrics" .-> auth
-    prometheus -. "scrape /metrics" .-> package
+    prometheus -. "scrape /metrics" .-> main
     prometheus -. "scrape /metrics" .-> workers
     prometheus -. "exporters" .-> rabbit
-    prometheus -. "exporters" .-> postgres
+    prometheus -. "exporters" .-> db
     grafana --> prometheus
     promtail -. "collect stdout" .-> auth
-    promtail -. "collect stdout" .-> package
+    promtail -. "collect stdout" .-> main
     promtail -. "collect stdout" .-> workers
     promtail --> loki
     grafana --> loki
-
-    classDef external fill:#f8fafc,stroke:#334155,color:#0f172a
-    classDef edgeClass fill:#dbeafe,stroke:#2563eb,color:#172554
-    classDef service fill:#dcfce7,stroke:#16a34a,color:#052e16
-    classDef asyncClass fill:#fef3c7,stroke:#d97706,color:#451a03
-    classDef data fill:#fee2e2,stroke:#dc2626,color:#450a0a
-    classDef obs fill:#ede9fe,stroke:#7c3aed,color:#2e1065
-
-    class user external
-    class ingress,frontend edgeClass
-    class auth,classrooms,task,package,notification service
-    class rabbit,workers,sandbox asyncClass
-    class postgres data
-    class prometheus,grafana,promtail,loki obs
 ```
 
 ## 3. Поток Проверки Решения
@@ -645,23 +622,3 @@ Error budget используется для управления релизам
 | Необратимые миграции ломают rollback | Expand/contract migrations, backward-compatible releases, staging restore tests. |
 | Worker вытесняет API workloads | Отдельный namespace/node pool, resource quotas, priority classes, pod anti-affinity. |
 | Недостаточная наблюдаемость инцидентов | RED metrics, correlationId, dashboards, alert runbooks, регулярные incident reviews. |
-
-## Definition Of Done
-
-| Требование | Статус |
-| --- | --- |
-| Markdown-документ создан | Выполнено |
-| Общая архитектура описана | Выполнено |
-| Mermaid architecture diagram добавлена | Выполнено |
-| Mermaid sequence diagram добавлена | Выполнено |
-| Kubernetes strategy описана | Выполнено |
-| Маршрутизация описана | Выполнено |
-| RabbitMQ exchanges, queues, DLQ, retry, message, idempotency описаны | Выполнено |
-| PostgreSQL storage, migrations, backup, restore, pooling описаны | Выполнено |
-| Prometheus/Grafana monitoring и минимум 6 alerts добавлены | Выполнено |
-| Loki/Promtail logging, JSON logs, correlationId описаны | Выполнено |
-| Безопасность запуска кода и securityContext описаны | Выполнено |
-| CI/CD, build, scan, deploy, rollback описаны | Выполнено |
-| SLO определены | Выполнено |
-| Таблица рисков добавлена | Выполнено |
-| GitHub Pages documentation framework добавлен | Выполнено |
