@@ -1,0 +1,850 @@
+openapi: 3.0.3
+info:
+  title: Main Service API
+  version: 1.0.0
+  description: API монолита для классрумов, задач, тестов и отправок решений.
+servers:
+  - url: http://localhost
+    description: Local Nginx gateway
+  - url: http://localhost:8080
+    description: Local Main Service
+tags:
+  - name: Classrooms
+    description: Работа с классрумами.
+  - name: Tasks
+    description: Работа с задачами и тестами.
+  - name: Submissions
+    description: Отправки решений и результаты проверки.
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/classrooms:
+    get:
+      tags: [Classrooms]
+      summary: Получить список доступных классрумов
+      operationId: getClassrooms
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Список классрумов.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedClassRoomResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Classrooms]
+      summary: Создать классрум
+      operationId: createClassroom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClassRoomCreateRequest"
+      responses:
+        "201":
+          description: Классрум создан.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClassRoomResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/classrooms/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ClassRoomId"
+    get:
+      tags: [Classrooms]
+      summary: Получить классрум
+      operationId: getClassroomById
+      responses:
+        "200":
+          description: Данные классрума.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClassRoomResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Classrooms]
+      summary: Полностью обновить классрум
+      operationId: updateClassroom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClassRoomUpdateRequest"
+      responses:
+        "200":
+          description: Классрум обновлен.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClassRoomResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Classrooms]
+      summary: Частично обновить классрум
+      operationId: patchClassroom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClassRoomPatchRequest"
+      responses:
+        "200":
+          description: Классрум обновлен.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClassRoomResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Classrooms]
+      summary: Мягко удалить классрум
+      operationId: deleteClassroom
+      responses:
+        "204":
+          description: Классрум помечен удаленным.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/classrooms/{classroomId}/tasks:
+    parameters:
+      - $ref: "#/components/parameters/ClassRoomIdByClassroomId"
+    get:
+      tags: [Tasks]
+      summary: Получить задачи классрума
+      operationId: getClassroomTasks
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Список задач.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedTaskResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [Tasks]
+      summary: Создать задачу
+      operationId: createTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskCreateRequest"
+      responses:
+        "201":
+          description: Задача создана.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskFullResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/classrooms/{classroomId}/tasks/{taskId}:
+    parameters:
+      - $ref: "#/components/parameters/ClassRoomIdByClassroomId"
+      - $ref: "#/components/parameters/TaskId"
+    get:
+      tags: [Tasks]
+      summary: Получить задачу
+      operationId: getTaskById
+      responses:
+        "200":
+          description: Детальная информация по задаче.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskFullResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Tasks]
+      summary: Полностью обновить задачу и тесты
+      operationId: updateTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskUpdateRequest"
+      responses:
+        "200":
+          description: Задача обновлена.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskFullResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Tasks]
+      summary: Частично обновить задачу
+      operationId: patchTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskPatchRequest"
+      responses:
+        "200":
+          description: Задача обновлена.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskFullResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Tasks]
+      summary: Мягко удалить задачу
+      operationId: deleteTask
+      responses:
+        "204":
+          description: Задача помечена удаленной.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/classrooms/{classroomId}/tasks/{taskId}/tests/upload:
+    parameters:
+      - $ref: "#/components/parameters/ClassRoomIdByClassroomId"
+      - $ref: "#/components/parameters/TaskId"
+    post:
+      tags: [Tasks]
+      summary: Загрузить тесты задачи из файла
+      operationId: uploadTaskTests
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: JSON-файл с массивом тестов.
+      responses:
+        "200":
+          description: Тесты загружены.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskTestsUploadResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/tasks/{taskId}/submissions:
+    parameters:
+      - $ref: "#/components/parameters/TaskId"
+    post:
+      tags: [Submissions]
+      summary: Отправить решение на проверку
+      operationId: createSubmission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmissionCreateRequest"
+      responses:
+        "202":
+          description: Решение принято на проверку.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionCreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    get:
+      tags: [Submissions]
+      summary: Получить отправки по задаче
+      operationId: getTaskSubmissions
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/SubmissionStatus"
+      responses:
+        "200":
+          description: Список отправок по задаче.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedSubmissionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/submissions:
+    get:
+      tags: [Submissions]
+      summary: Получить историю отправок
+      operationId: getSubmissions
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/SubmissionStatus"
+        - name: taskId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: classroomId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: userId
+          in: query
+          description: Доступно для Admin или ролей с правами на классрум.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: История отправок.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedSubmissionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/submissions/{packageId}:
+    parameters:
+      - $ref: "#/components/parameters/PackageId"
+    get:
+      tags: [Submissions]
+      summary: Получить конкретную отправку и результат
+      operationId: getSubmissionById
+      responses:
+        "200":
+          description: Данные отправки.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    ClassRoomId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ClassRoomIdByClassroomId:
+      name: classroomId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PackageId:
+      name: packageId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SubmissionStatus:
+      name: status
+      in: query
+      schema:
+        $ref: "#/components/schemas/PackageStatus"
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Пользователь не авторизован.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Недостаточно прав.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Ресурс не найден.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    PageMeta:
+      type: object
+      required: [page, pageSize, totalItems, totalPages]
+      properties:
+        page:
+          type: integer
+          example: 1
+        pageSize:
+          type: integer
+          example: 20
+        totalItems:
+          type: integer
+          example: 42
+        totalPages:
+          type: integer
+          example: 3
+
+    ErrorResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          example: Недостаточно прав.
+        traceId:
+          type: string
+          nullable: true
+
+    ClassRoomRole:
+      type: string
+      enum: [Student, Assistant, Teacher]
+
+    GlobalRole:
+      type: string
+      enum: [User, Admin]
+
+    PackageStatus:
+      type: string
+      enum:
+        - Pending
+        - Running
+        - Accepted
+        - Rejected
+        - CompilationError
+        - RuntimeError
+        - InfrastructureError
+
+    Language:
+      type: string
+      enum: [Cpp, CSharp, Python, Java, C, Go]
+
+    ClassRoomCreateRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: Algorithms 101
+
+    ClassRoomUpdateRequest:
+      allOf:
+        - $ref: "#/components/schemas/ClassRoomCreateRequest"
+
+    ClassRoomPatchRequest:
+      type: object
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: Algorithms 101 updated
+
+    ClassRoomResponse:
+      type: object
+      required: [id, title, createdByUserId, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        createdByUserId:
+          type: string
+          format: uuid
+        currentUserRole:
+          $ref: "#/components/schemas/ClassRoomRole"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PagedClassRoomResponse:
+      type: object
+      required: [items, meta]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ClassRoomResponse"
+        meta:
+          $ref: "#/components/schemas/PageMeta"
+
+    TaskTestRequest:
+      type: object
+      required: [in, out]
+      properties:
+        in:
+          type: string
+          example: "2 2"
+        out:
+          type: string
+          example: "4"
+        isHidden:
+          type: boolean
+          default: true
+
+    TaskTestResponse:
+      type: object
+      required: [id, input, expectedOutput, orderNumber, isHidden]
+      properties:
+        id:
+          type: string
+          format: uuid
+        input:
+          type: string
+        expectedOutput:
+          type: string
+        orderNumber:
+          type: integer
+        isHidden:
+          type: boolean
+
+    TaskCreateRequest:
+      type: object
+      required: [title, description]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          minLength: 1
+        inputSample:
+          type: string
+          nullable: true
+        outputSample:
+          type: string
+          nullable: true
+        tests:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskTestRequest"
+
+    TaskUpdateRequest:
+      allOf:
+        - $ref: "#/components/schemas/TaskCreateRequest"
+
+    TaskPatchRequest:
+      type: object
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          minLength: 1
+        inputSample:
+          type: string
+          nullable: true
+        outputSample:
+          type: string
+          nullable: true
+
+    TaskResponse:
+      type: object
+      required: [id, classroomId, title, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        classroomId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        inputSample:
+          type: string
+          nullable: true
+        outputSample:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    TaskFullResponse:
+      allOf:
+        - $ref: "#/components/schemas/TaskResponse"
+        - type: object
+          required: [description, tests]
+          properties:
+            description:
+              type: string
+            tests:
+              type: array
+              description: Для студентов скрытые тесты не возвращаются.
+              items:
+                $ref: "#/components/schemas/TaskTestResponse"
+
+    PagedTaskResponse:
+      type: object
+      required: [items, meta]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskResponse"
+        meta:
+          $ref: "#/components/schemas/PageMeta"
+
+    TaskTestsUploadResponse:
+      type: object
+      required: [taskId, uploadedTestsCount]
+      properties:
+        taskId:
+          type: string
+          format: uuid
+        uploadedTestsCount:
+          type: integer
+          example: 12
+
+    SubmissionCreateRequest:
+      type: object
+      required: [language, code]
+      properties:
+        language:
+          $ref: "#/components/schemas/Language"
+        code:
+          type: string
+          minLength: 1
+
+    SubmissionCreateResponse:
+      type: object
+      required: [packageId, status]
+      properties:
+        packageId:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/PackageStatus"
+
+    PackageResultResponse:
+      type: object
+      required: [passedTests, failedTests, checkedAt]
+      nullable: true
+      properties:
+        passedTests:
+          type: integer
+          minimum: 0
+        failedTests:
+          type: integer
+          minimum: 0
+        output:
+          type: string
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        executionTimeMs:
+          type: integer
+          nullable: true
+        memoryKb:
+          type: integer
+          nullable: true
+        checkedAt:
+          type: string
+          format: date-time
+
+    SubmissionResponse:
+      type: object
+      required: [packageId, taskId, userId, language, status, createdAt]
+      properties:
+        packageId:
+          type: string
+          format: uuid
+        taskId:
+          type: string
+          format: uuid
+        taskTitle:
+          type: string
+        classroomId:
+          type: string
+          format: uuid
+        classroomTitle:
+          type: string
+        userId:
+          type: string
+          format: uuid
+        language:
+          $ref: "#/components/schemas/Language"
+        status:
+          $ref: "#/components/schemas/PackageStatus"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        result:
+          $ref: "#/components/schemas/PackageResultResponse"
+
+    SubmissionDetailResponse:
+      allOf:
+        - $ref: "#/components/schemas/SubmissionResponse"
+        - type: object
+          required: [code]
+          properties:
+            code:
+              type: string
+
+    PagedSubmissionResponse:
+      type: object
+      required: [items, meta]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubmissionResponse"
+        meta:
+          $ref: "#/components/schemas/PageMeta"

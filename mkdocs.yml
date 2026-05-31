@@ -41,6 +41,7 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Main Service: main-service.md
   - SRE Architecture: sre-architecture.md
   - Kubernetes:
       - K3s Bootstrap: kubernetes/k3s-bootstrap.md
