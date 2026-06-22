@@ -37,66 +37,75 @@
 ## 2. Архитектурная Диаграмма
 
 ```mermaid
-flowchart LR
-    user["Client / Frontend"]
+flowchart TB
+    client["API client"]
 
-    subgraph edge["Edge"]
-        ingress["Nginx Gateway"]
-        frontend["frontend"]
+    subgraph cluster["k3s cluster (Ansible bootstrap)"]
+        direction TB
+        traefik["Traefik Ingress Controller"]
+
+        subgraph app["namespace: app"]
+            direction LR
+            publicIngress["sunboys-auth-public<br/>/api/auth/*"]
+            protectedIngress["sunboys-main-protected<br/>/api/main/*"]
+            forwardAuth["Traefik ForwardAuth<br/>auth-forward"]
+            auth["AuthorizationService<br/>ASP.NET Core 9"]
+            main["MainService<br/>ASP.NET Core 9"]
+            runner["Code Runner Service<br/>Spring Boot 3 / Java 17"]
+        end
+
+        subgraph infra["namespace: infra"]
+            direction LR
+            authDb[("auth-postgres<br/>PostgreSQL StatefulSet + PVC")]
+            mainDb[("main-postgres<br/>PostgreSQL StatefulSet + PVC")]
+            rabbit[("RabbitMQ<br/>StatefulSet + PVC")]
+            pgadmin["pgAdmin<br/>development UI"]
+        end
+
+        subgraph execution["worker nodes / execution boundary"]
+            dockerSocket["host Docker socket"]
+            sandboxes["Reusable language containers<br/>Java · Python · C++ · C# · Go"]
+        end
+
+        subgraph monitoring["namespace: monitoring"]
+            direction LR
+            prometheus["Prometheus"]
+            alloy["Grafana Alloy<br/>DaemonSet"]
+            loki[("Loki + PVC<br/>6h retention")]
+            grafana["Grafana + dashboards"]
+        end
+
+        subgraph autoscaling["namespace: keda"]
+            keda["KEDA operator<br/>Code Runner autoscaling"]
+        end
     end
 
-    subgraph api["API services"]
-        auth["auth-service"]
-        main["main-service"]
-        notification["notification-service"]
-    end
+    client -->|"HTTP(S)"| traefik
+    traefik --> publicIngress --> auth
+    traefik --> protectedIngress
+    protectedIngress --> forwardAuth
+    forwardAuth -->|"validate request"| auth
+    forwardAuth -->|"X-User-Id / X-User-Role"| main
 
-    subgraph async["Async execution"]
-        rabbit[["RabbitMQ"]]
-        workers["run-worker pool"]
-        sandbox["Sandbox containers"]
-    end
+    auth -->|"users, JWT data"| authDb
+    main -->|"classrooms, tasks, solutions"| mainDb
+    main -->|"code-execution-requests"| rabbit
+    rabbit -->|"consume requests"| runner
+    runner -->|"code-execution-results"| rabbit
+    rabbit -->|"consume results"| main
+    runner -->|"execution state"| mainDb
+    runner --> dockerSocket --> sandboxes
+    pgadmin -. "admin access" .-> authDb
+    pgadmin -. "admin access" .-> mainDb
 
-    subgraph storage["Stateful storage"]
-        db[("PostgreSQL")]
-    end
-
-    subgraph observe["Observability"]
-        prometheus["Prometheus"]
-        grafana["Grafana"]
-        promtail["Promtail"]
-        loki["Loki"]
-    end
-
-    user -->|"HTTPS"| ingress
-    ingress --> frontend
-    ingress -->|"REST API"| auth
-    ingress -->|"REST API"| main
-
-    frontend -->|"REST API"| auth
-    frontend -->|"REST API"| main
-
-    main -->|"validate JWT"| auth
-    main -->|"read/write data"| db
-    auth -->|"users and roles"| db
-    main -->|"publish check request"| rabbit
-    rabbit -->|"consume"| workers
-    workers -->|"execute"| sandbox
-    workers -->|"publish result"| rabbit
-    rabbit -->|"completion event"| main
-    main -->|"notify status changes"| notification
-
-    prometheus -. "scrape /metrics" .-> auth
     prometheus -. "scrape /metrics" .-> main
-    prometheus -. "scrape /metrics" .-> workers
-    prometheus -. "exporters" .-> rabbit
-    prometheus -. "exporters" .-> db
+    prometheus -. "scrape /actuator/prometheus" .-> runner
+    alloy -. "collect pod stdout/stderr" .-> app
+    alloy -. "collect pod stdout/stderr" .-> infra
+    alloy --> loki
     grafana --> prometheus
-    promtail -. "collect stdout" .-> auth
-    promtail -. "collect stdout" .-> main
-    promtail -. "collect stdout" .-> workers
-    promtail --> loki
     grafana --> loki
+    keda -. "scale Deployment from RabbitMQ load" .-> runner
 ```
 
 ## 3. Поток Проверки Решения
@@ -104,54 +113,38 @@ flowchart LR
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as Student / Teacher
-    participant FE as frontend
-    participant ING as Nginx Ingress
-    participant AUTH as auth-service
-    participant PKG as package-service
-    participant DB as PostgreSQL
+    actor Client as API client
+    participant ING as Traefik Ingress
+    participant AUTH as AuthorizationService
+    participant MAIN as MainService
+    participant DB as main-postgres
     participant MQ as RabbitMQ
-    participant WRK as run-worker
-    participant TASK as task-service
-    participant NOTIF as notification-service
+    participant RUN as Code Runner Service
+    participant DOCKER as Language container
 
-    rect rgb(239, 246, 255)
-        User->>FE: Upload solution
-        FE->>ING: POST /api/submissions
-        ING->>PKG: Route request
-        PKG->>AUTH: Validate token and access
-        AUTH-->>PKG: Claims and roles
-    end
+    Client->>ING: Authenticated solution request
+    ING->>AUTH: ForwardAuth validation
+    AUTH-->>ING: X-User-Id, X-User-Role
+    ING->>MAIN: Forward protected request
+    MAIN->>DB: Store solution
+    MAIN->>MQ: Publish code-execution-requests
+    MAIN-->>Client: Accepted / solution id
 
-    rect rgb(240, 253, 244)
-        PKG->>DB: Create submission: Queued
-        PKG->>MQ: Publish check.requested
-        PKG-->>FE: 202 Accepted, submissionId
-    end
+    MQ-->>RUN: Deliver execution request
+    RUN->>DB: Read execution data
+    RUN->>DOCKER: Compile and run with limits
+    DOCKER-->>RUN: Output and verdict
+    RUN->>DB: Persist execution state
+    RUN->>MQ: Publish code-execution-results
+    MQ-->>MAIN: Consume execution result
+    MAIN->>DB: Update solution status
 
-    rect rgb(255, 251, 235)
-        MQ-->>WRK: Deliver check request
-        WRK->>TASK: Load limits and tests
-        WRK->>DB: Mark Running
-        WRK->>WRK: Sandbox compile and test
-        WRK->>DB: Save verdict and metrics
-    end
-
-    alt accepted or checked
-        WRK->>MQ: Publish check.completed
-    else infrastructure or runner failure
-        WRK->>MQ: Publish check.failed
-    end
-
-    rect rgb(245, 243, 255)
-        MQ-->>NOTIF: Deliver result event
-        NOTIF->>DB: Load recipients
-        NOTIF-->>FE: Notify status changed
-        FE->>ING: GET /api/submissions/{id}
-        ING->>PKG: Route read request
-        PKG->>DB: Load result
-        PKG-->>FE: Verdict and details
-    end
+    Client->>ING: GET solution status
+    ING->>AUTH: ForwardAuth validation
+    AUTH-->>ING: Identity headers
+    ING->>MAIN: Forward request
+    MAIN->>DB: Load result
+    MAIN-->>Client: Status and verdict
 ```
 
 ## 4. Kubernetes
